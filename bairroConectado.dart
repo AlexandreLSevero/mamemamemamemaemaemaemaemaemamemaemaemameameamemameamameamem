@@ -1789,7 +1789,6 @@ class SuccessScreen extends StatelessWidget {
 class ConfirmationScreen extends StatelessWidget {
   const ConfirmationScreen({super.key});
 
-  // Updated categories list to match CategoryScreen
   final List<Category> categories = const <Category>[
     Category(
       id: 'lighting',
@@ -1844,6 +1843,15 @@ class ConfirmationScreen extends StatelessWidget {
       color: Colors.brown,
       textColor: Colors.brown,
       borderColor: Colors.brown,
+    ),
+    Category(
+      id: 'animals',
+      title: 'Animais Abandonados',
+      description: 'Animais de rua, maus-tratos',
+      icon: Icons.pets,
+      color: Colors.pink,
+      textColor: Colors.pink,
+      borderColor: Colors.pinkAccent,
     ),
   ];
 
@@ -2058,7 +2066,6 @@ class ConfirmationScreen extends StatelessWidget {
 class DetailsScreen extends StatelessWidget {
   const DetailsScreen({super.key});
 
-  // Updated categories list to match CategoryScreen
   final List<Category> categories = const <Category>[
     Category(
       id: 'lighting',
@@ -2113,6 +2120,15 @@ class DetailsScreen extends StatelessWidget {
       color: Colors.brown,
       textColor: Colors.brown,
       borderColor: Colors.brown,
+    ),
+    Category(
+      id: 'animals',
+      title: 'Animais Abandonados',
+      description: 'Animais de rua, maus-tratos',
+      icon: Icons.pets,
+      color: Colors.pink,
+      textColor: Colors.pink,
+      borderColor: Colors.pinkAccent,
     ),
   ];
 
@@ -2496,6 +2512,15 @@ class CategoryScreen extends StatelessWidget {
       color: Colors.brown,
       textColor: Colors.brown,
       borderColor: Colors.brown,
+    ),
+    Category(
+      id: 'animals',
+      title: 'Animais Abandonados',
+      description: 'Animais de rua, maus-tratos',
+      icon: Icons.pets,
+      color: Colors.pink,
+      textColor: Colors.pink,
+      borderColor: Colors.pinkAccent,
     ),
   ];
 
