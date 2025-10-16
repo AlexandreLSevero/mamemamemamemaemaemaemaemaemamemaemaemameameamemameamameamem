@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Added provider for state management
+import 'package:provider/provider.dart';
 import 'dart:async'; // For Future.delayed
 
 void main() {
@@ -21,13 +21,13 @@ class BairroConectadoApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.grey[100],
-        cardTheme: CardThemeData( // Removed const from CardThemeData
+        cardTheme: CardThemeData(
           elevation: 2,
           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // Added shape for consistent styling
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: Theme.of(context).primaryColor,
+          backgroundColor: Colors.blue, // Using a direct color as theme context might not be available
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
@@ -55,7 +55,7 @@ class BairroConectadoApp extends StatelessWidget {
           ),
         ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: Theme.of(context).primaryColor,
+          selectedItemColor: Colors.blue, // Using a direct color as theme context might not be available
           unselectedItemColor: Colors.grey[600],
           backgroundColor: Colors.white,
           elevation: 8,
@@ -70,6 +70,7 @@ class BairroConectadoApp extends StatelessWidget {
         '/polls': (context) => const PollsScreen(),
         '/forum': (context) => const ForumScreen(),
         '/new-topic': (context) => const NewTopicScreen(),
+        '/new-poll': (context) => const NewPollScreen(), // New route for creating polls
         '/success': (context) => const SuccessScreen(),
         '/confirmation': (context) => const ConfirmationScreen(),
         '/details': (context) => const DetailsScreen(),
@@ -189,9 +190,19 @@ class AppState extends ChangeNotifier {
   String description = '';
   String attachedPhoto = '';
   String forumSearchQuery = '';
+
   String newTopicTitle = '';
   String newTopicContent = '';
   String newTopicCategory = '';
+
+  String _newPollTitle = '';
+  List<String> _newPollOptions = <String>['', '']; // Start with two empty options
+  bool _isPublishingPoll = false;
+
+  String get newPollTitle => _newPollTitle;
+  List<String> get newPollOptions => _newPollOptions;
+  bool get isPublishingPoll => _isPublishingPoll;
+
   String? selectedPoll;
   bool isLoadingLocation = false;
 
@@ -235,6 +246,37 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setNewPollTitle(String value) {
+    _newPollTitle = value;
+    notifyListeners();
+  }
+
+  void addPollOption() {
+    if (_newPollOptions.length < 5) { // Limit to 5 options
+      _newPollOptions.add('');
+      notifyListeners();
+    }
+  }
+
+  void updatePollOption(int index, String value) {
+    if (index >= 0 && index < _newPollOptions.length) {
+      _newPollOptions[index] = value;
+      notifyListeners();
+    }
+  }
+
+  void removePollOption(int index) {
+    if (_newPollOptions.length > 2 && index >= 0 && index < _newPollOptions.length) {
+      _newPollOptions.removeAt(index);
+      notifyListeners();
+    }
+  }
+
+  void setIsLoadingPublishingPoll(bool value) {
+    _isPublishingPoll = value;
+    notifyListeners();
+  }
+
   void setSelectedPoll(String? value) {
     selectedPoll = value;
     notifyListeners();
@@ -245,11 +287,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void resetForm() {
+  void resetReportForm() {
     selectedCategory = '';
     location = '';
     description = '';
     attachedPhoto = '';
+    notifyListeners();
+  }
+
+  void resetNewTopicForm() {
+    newTopicTitle = '';
+    newTopicContent = '';
+    newTopicCategory = '';
+    notifyListeners();
+  }
+
+  void resetNewPollForm() {
+    _newPollTitle = '';
+    _newPollOptions = <String>['', ''];
+    _isPublishingPoll = false;
     notifyListeners();
   }
 }
@@ -428,13 +484,13 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Provider.of<AppState>(context, listen: false).resetForm();
+          Provider.of<AppState>(context, listen: false).resetReportForm();
           Navigator.pushNamed(context, '/category');
         },
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Icon(Icons.campaign), // Changed from FeatherIcons.megaphone
+            Icon(Icons.campaign),
             Text('Reportar', style: TextStyle(fontSize: 10)),
           ],
         ),
@@ -544,8 +600,7 @@ class PollsScreen extends StatelessWidget {
         actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.filter_list),
-            onPressed: () {
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -642,7 +697,7 @@ class PollsScreen extends StatelessWidget {
                                               appState.setSelectedPoll('${poll.id}-${option.id}');
                                               // In a real app, you would update the backend/data model here
                                               // For now, we just print the selection
-                                              print('Voted for option ${option.id} in poll ${poll.id}');
+                                              debugPrint('Voted for option ${option.id} in poll ${poll.id}');
                                             },
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,10 +816,10 @@ class PollsScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 8),
                                   ...poll.options.map<Widget>((PollOption option) {
-                                    final bool isWinner = option.percentage ==
-                                        poll.options
-                                            .map<int>((PollOption o) => o.percentage)
-                                            .reduce((int a, int b) => a > b ? a : b);
+                                    final int maxPercentage = poll.options
+                                        .map<int>((PollOption o) => o.percentage)
+                                        .reduce((int a, int b) => a > b ? a : b);
+                                    final bool isWinner = option.percentage == maxPercentage;
                                     final bool isUserChoice = poll.userChoice == option.id;
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 8.0),
@@ -859,6 +914,15 @@ class PollsScreen extends StatelessWidget {
           );
         },
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Provider.of<AppState>(context, listen: false).resetNewPollForm();
+          Navigator.pushNamed(context, '/new-poll');
+        },
+        label: const Text('Criar Enquete'),
+        icon: const Icon(Icons.add),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 2,
         onTap: (int index) {
@@ -886,6 +950,173 @@ class PollsScreen extends StatelessWidget {
     );
   }
 }
+
+class NewPollScreen extends StatelessWidget {
+  const NewPollScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context); // Go back to PollsScreen
+          },
+        ),
+        title: const Text('Criar Nova Enquete'),
+      ),
+      body: Consumer<AppState>(
+        builder: (BuildContext context, AppState appState, Widget? child) {
+          final bool canPublish = appState.newPollTitle.length >= 10 &&
+              appState.newPollOptions.length >= 2 &&
+              appState.newPollOptions.every((String option) => option.trim().length >= 3);
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Defina o título e as opções para sua nova enquete.',
+                  style: TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: TextEditingController(text: appState.newPollTitle),
+                  decoration: InputDecoration(
+                    labelText: 'Título da Enquete *',
+                    hintText: 'Ex: Qual a prioridade para o próximo mês?',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onChanged: (String value) {
+                    appState.setNewPollTitle(value);
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Mínimo de 10 caracteres (${appState.newPollTitle.length}/10)',
+                  style: TextStyle(
+                      color: appState.newPollTitle.length < 10 ? Colors.red : Colors.grey,
+                      fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Opções da Enquete * (Mínimo 2, máximo 5)',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                ...appState.newPollOptions.asMap().entries.map<Widget>((MapEntry<int, String> entry) {
+                  final int index = entry.key;
+                  final String optionText = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: TextField(
+                            controller: TextEditingController(text: optionText),
+                            decoration: InputDecoration(
+                              labelText: 'Opção ${index + 1}',
+                              hintText: 'Ex: Melhorias na iluminação pública',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              errorText: optionText.trim().length < 3 && optionText.isNotEmpty
+                                  ? 'Mínimo 3 caracteres'
+                                  : null,
+                            ),
+                            onChanged: (String value) {
+                              appState.updatePollOption(index, value);
+                            },
+                          ),
+                        ),
+                        if (appState.newPollOptions.length > 2)
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            onPressed: appState.isPublishingPoll
+                                ? null
+                                : () {
+                                    appState.removePollOption(index);
+                                  },
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                if (appState.newPollOptions.length < 5)
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: appState.isPublishingPoll
+                        ? null
+                        : () {
+                            appState.addPollOption();
+                          },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.add),
+                        SizedBox(width: 8),
+                        Text('Adicionar Opção'),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                  ),
+                  onPressed: appState.isPublishingPoll || !canPublish
+                      ? null
+                      : () async {
+                          appState.setIsLoadingPublishingPoll(true); // Fixed method call
+                          await Future<void>.delayed(const Duration(seconds: 2)); // Simulate API call
+                          debugPrint('Nova enquete publicada: ${appState.newPollTitle}');
+                          for (final String option in appState.newPollOptions) {
+                            debugPrint(' - $option');
+                          }
+                          appState.resetNewPollForm();
+                          appState.setIsLoadingPublishingPoll(false); // Fixed method call
+                          Navigator.pop(context); // Go back to PollsScreen
+                        },
+                  child: appState.isPublishingPoll
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Icon(Icons.publish),
+                            SizedBox(width: 8),
+                            Text('Publicar Enquete'),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                  ),
+                  onPressed: appState.isPublishingPoll
+                      ? null
+                      : () {
+                          appState.resetNewPollForm();
+                          Navigator.pop(context);
+                        },
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 
 class ForumScreen extends StatelessWidget {
   const ForumScreen({super.key});
@@ -952,9 +1183,7 @@ class ForumScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              Provider.of<AppState>(context, listen: false).setNewTopicTitle('');
-              Provider.of<AppState>(context, listen: false).setNewTopicContent('');
-              Provider.of<AppState>(context, listen: false).setNewTopicCategory('');
+              Provider.of<AppState>(context, listen: false).resetNewTopicForm();
               Navigator.pushNamed(context, '/new-topic');
             },
           ),
@@ -1017,7 +1246,7 @@ class ForumScreen extends StatelessWidget {
                           padding: const EdgeInsets.all(16.0),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[ // Corrected: removed 'widget' and added a Column
+                            children: <Widget>[
                               Container(
                                 width: 40,
                                 height: 40,
@@ -1114,9 +1343,7 @@ class ForumScreen extends StatelessWidget {
                             minimumSize: const Size(double.infinity, 60),
                           ),
                           onPressed: () {
-                            appState.setNewTopicTitle('');
-                            appState.setNewTopicContent('');
-                            appState.setNewTopicCategory('');
+                            appState.resetNewTopicForm();
                             Navigator.pushNamed(context, '/new-topic');
                           },
                           child: const Row(
@@ -1323,11 +1550,9 @@ class NewTopicScreen extends StatelessWidget {
                           appState.newTopicCategory.isEmpty
                       ? null
                       : () {
-                          print('Nova discussão: ${appState.newTopicTitle}, '
+                          debugPrint('Nova discussão: ${appState.newTopicTitle}, '
                               '${appState.newTopicContent}, ${appState.newTopicCategory}');
-                          appState.setNewTopicTitle('');
-                          appState.setNewTopicContent('');
-                          appState.setNewTopicCategory('');
+                          appState.resetNewTopicForm();
                           Navigator.pushNamed(context, '/forum');
                         },
                   child: const Row(
@@ -1529,7 +1754,7 @@ class SuccessScreen extends StatelessWidget {
                   minimumSize: const Size(double.infinity, 60),
                 ),
                 onPressed: () {
-                  Provider.of<AppState>(context, listen: false).resetForm();
+                  Provider.of<AppState>(context, listen: false).resetReportForm();
                   Navigator.pushNamed(context, '/');
                 },
                 child: const Row(
@@ -1564,12 +1789,13 @@ class SuccessScreen extends StatelessWidget {
 class ConfirmationScreen extends StatelessWidget {
   const ConfirmationScreen({super.key});
 
+  // Updated categories list to match CategoryScreen
   final List<Category> categories = const <Category>[
     Category(
       id: 'lighting',
       title: 'Iluminação',
       description: 'Postes queimados, falta de luz',
-      icon: Icons.lightbulb_outline, // Changed from FeatherIcons.lightBulb
+      icon: Icons.lightbulb_outline,
       color: Colors.yellow,
       textColor: Colors.amber,
       borderColor: Colors.yellowAccent,
@@ -1578,7 +1804,7 @@ class ConfirmationScreen extends StatelessWidget {
       id: 'road',
       title: 'Buraco na Rua',
       description: 'Buracos, asfalto danificado',
-      icon: Icons.traffic, // Changed from FeatherIcons.truck
+      icon: Icons.traffic,
       color: Colors.orange,
       textColor: Colors.orange,
       borderColor: Colors.orangeAccent,
@@ -1587,7 +1813,7 @@ class ConfirmationScreen extends StatelessWidget {
       id: 'trash',
       title: 'Acúmulo de Lixo',
       description: 'Lixo acumulado, coleta atrasada',
-      icon: Icons.delete_outline, // Changed from FeatherIcons.trash2
+      icon: Icons.delete_outline,
       color: Colors.green,
       textColor: Colors.green,
       borderColor: Colors.greenAccent,
@@ -1596,10 +1822,28 @@ class ConfirmationScreen extends StatelessWidget {
       id: 'security',
       title: 'Segurança',
       description: 'Problemas de segurança pública',
-      icon: Icons.security, // Changed from FeatherIcons.shield
+      icon: Icons.security,
       color: Colors.red,
       textColor: Colors.red,
       borderColor: Colors.redAccent,
+    ),
+    Category(
+      id: 'water',
+      title: 'Vazamento de Água',
+      description: 'Vazamentos, falta de água',
+      icon: Icons.water_drop_outlined,
+      color: Colors.blue,
+      textColor: Colors.blue,
+      borderColor: Colors.blueAccent,
+    ),
+    Category(
+      id: 'vegetation',
+      title: 'Vegetação Alta',
+      description: 'Matagal, árvores caídas',
+      icon: Icons.forest,
+      color: Colors.brown,
+      textColor: Colors.brown,
+      borderColor: Colors.brown,
     ),
   ];
 
@@ -1648,6 +1892,7 @@ class ConfirmationScreen extends StatelessWidget {
       ),
       body: Consumer<AppState>(
         builder: (BuildContext context, AppState appState, Widget? child) {
+          // Find the selected category data, providing a fallback if not found (though it should be found now)
           final Category selectedCategoryData =
               categories.firstWhere((Category c) => c.id == appState.selectedCategory, orElse: () => categories[0]);
 
@@ -1676,7 +1921,7 @@ class ConfirmationScreen extends StatelessWidget {
                                 color: Colors.blue.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.campaign, size: 16), // Changed from FeatherIcons.megaphone
+                              child: const Icon(Icons.campaign, size: 16),
                             ),
                             const SizedBox(width: 8),
                             const Text(
@@ -1762,7 +2007,7 @@ class ConfirmationScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Após o envio, você receberá um número de protocolo para acompanhar o andamento do seu chamado. A Prefeitura tem até 5 dias úteis para responder.',
+                                'Após o envio, você receberá um número de protocolo para acompanhar o amndamento do seu chamado. A Prefeitura tem até 5 dias úteis para responder.',
                                 style: TextStyle(color: Colors.blue[800]),
                               ),
                             ],
@@ -1813,12 +2058,13 @@ class ConfirmationScreen extends StatelessWidget {
 class DetailsScreen extends StatelessWidget {
   const DetailsScreen({super.key});
 
+  // Updated categories list to match CategoryScreen
   final List<Category> categories = const <Category>[
     Category(
       id: 'lighting',
       title: 'Iluminação',
       description: 'Postes queimados, falta de luz',
-      icon: Icons.lightbulb_outline, // Changed from FeatherIcons.lightBulb
+      icon: Icons.lightbulb_outline,
       color: Colors.yellow,
       textColor: Colors.amber,
       borderColor: Colors.yellowAccent,
@@ -1827,7 +2073,7 @@ class DetailsScreen extends StatelessWidget {
       id: 'road',
       title: 'Buraco na Rua',
       description: 'Buracos, asfalto danificado',
-      icon: Icons.traffic, // Changed from FeatherIcons.truck
+      icon: Icons.traffic,
       color: Colors.orange,
       textColor: Colors.orange,
       borderColor: Colors.orangeAccent,
@@ -1836,7 +2082,7 @@ class DetailsScreen extends StatelessWidget {
       id: 'trash',
       title: 'Acúmulo de Lixo',
       description: 'Lixo acumulado, coleta atrasada',
-      icon: Icons.delete_outline, // Changed from FeatherIcons.trash2
+      icon: Icons.delete_outline,
       color: Colors.green,
       textColor: Colors.green,
       borderColor: Colors.greenAccent,
@@ -1845,10 +2091,28 @@ class DetailsScreen extends StatelessWidget {
       id: 'security',
       title: 'Segurança',
       description: 'Problemas de segurança pública',
-      icon: Icons.security, // Changed from FeatherIcons.shield
+      icon: Icons.security,
       color: Colors.red,
       textColor: Colors.red,
       borderColor: Colors.redAccent,
+    ),
+    Category(
+      id: 'water',
+      title: 'Vazamento de Água',
+      description: 'Vazamentos, falta de água',
+      icon: Icons.water_drop_outlined,
+      color: Colors.blue,
+      textColor: Colors.blue,
+      borderColor: Colors.blueAccent,
+    ),
+    Category(
+      id: 'vegetation',
+      title: 'Vegetação Alta',
+      description: 'Matagal, árvores caídas',
+      icon: Icons.forest,
+      color: Colors.brown,
+      textColor: Colors.brown,
+      borderColor: Colors.brown,
     ),
   ];
 
@@ -2055,7 +2319,7 @@ class LocationScreen extends StatelessWidget {
       appState.setLocation('Localização atual (Exemplo de Lat: -23.5505, Long: -46.6333)');
     } catch (e) {
       appState.setLocation('Erro ao obter localização');
-      print('Erro ao obter localização: $e');
+      debugPrint('Erro ao obter localização: $e');
     } finally {
       appState.setIsLoadingLocation(false);
     }
@@ -2183,16 +2447,16 @@ class CategoryScreen extends StatelessWidget {
       id: 'lighting',
       title: 'Iluminação',
       description: 'Postes queimados, falta de luz',
-      icon: Icons.lightbulb_outline, // Changed from FeatherIcons.lightBulb
+      icon: Icons.lightbulb_outline,
       color: Colors.yellow,
-      textColor: Colors.amber, // Adjusted for better visibility
+      textColor: Colors.amber,
       borderColor: Colors.yellowAccent,
     ),
     Category(
       id: 'road',
       title: 'Buraco na Rua',
       description: 'Buracos, asfalto danificado',
-      icon: Icons.traffic, // Changed from FeatherIcons.truck
+      icon: Icons.traffic,
       color: Colors.orange,
       textColor: Colors.orange,
       borderColor: Colors.orangeAccent,
@@ -2201,7 +2465,7 @@ class CategoryScreen extends StatelessWidget {
       id: 'trash',
       title: 'Acúmulo de Lixo',
       description: 'Lixo acumulado, coleta atrasada',
-      icon: Icons.delete_outline, // Changed from FeatherIcons.trash2
+      icon: Icons.delete_outline,
       color: Colors.green,
       textColor: Colors.green,
       borderColor: Colors.greenAccent,
@@ -2210,7 +2474,7 @@ class CategoryScreen extends StatelessWidget {
       id: 'security',
       title: 'Segurança',
       description: 'Problemas de segurança pública',
-      icon: Icons.security, // Changed from FeatherIcons.shield
+      icon: Icons.security,
       color: Colors.red,
       textColor: Colors.red,
       borderColor: Colors.redAccent,
@@ -2219,7 +2483,7 @@ class CategoryScreen extends StatelessWidget {
       id: 'water',
       title: 'Vazamento de Água',
       description: 'Vazamentos, falta de água',
-      icon: Icons.water_drop_outlined, // Changed from FeatherIcons.droplet
+      icon: Icons.water_drop_outlined,
       color: Colors.blue,
       textColor: Colors.blue,
       borderColor: Colors.blueAccent,
@@ -2228,7 +2492,7 @@ class CategoryScreen extends StatelessWidget {
       id: 'vegetation',
       title: 'Vegetação Alta',
       description: 'Matagal, árvores caídas',
-      icon: Icons.forest, // Changed from FeatherIcons.gitBranch
+      icon: Icons.forest,
       color: Colors.brown,
       textColor: Colors.brown,
       borderColor: Colors.brown,
@@ -2342,7 +2606,7 @@ class TrackingScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pop(context); 
+            Navigator.pop(context);
           },
         ),
         title: const Text('Acompanhar Chamado'),
@@ -2369,7 +2633,7 @@ class TrackingScreen extends StatelessWidget {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context); 
+                  Navigator.pop(context);
                 },
                 child: const Text('Voltar'),
               ),
