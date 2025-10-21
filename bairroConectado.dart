@@ -5,8 +5,8 @@ import 'dart:async'; // For Future.delayed
 void main() {
   runApp(
     ChangeNotifierProvider<AppState>(
-      create: (context) => AppState(),
-      builder: (context, child) => const BairroConectadoApp(),
+      create: (BuildContext context) => AppState(),
+      builder: (BuildContext context, Widget? child) => const BairroConectadoApp(),
     ),
   );
 }
@@ -66,17 +66,17 @@ class BairroConectadoApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const HomeScreen(),
-        '/polls': (context) => const PollsScreen(),
-        '/forum': (context) => const ForumScreen(),
-        '/new-topic': (context) => const NewTopicScreen(),
-        '/new-poll': (context) => const NewPollScreen(), // New route for creating polls
-        '/success': (context) => const SuccessScreen(),
-        '/confirmation': (context) => const ConfirmationScreen(),
-        '/details': (context) => const DetailsScreen(),
-        '/location': (context) => const LocationScreen(),
-        '/category': (context) => const CategoryScreen(),
-        '/tracking': (context) => const TrackingScreen(),
+        '/': (BuildContext context) => const HomeScreen(),
+        '/polls': (BuildContext context) => const PollsScreen(),
+        '/forum': (BuildContext context) => const ForumScreen(),
+        '/new-topic': (BuildContext context) => const NewTopicScreen(),
+        '/new-poll': (BuildContext context) => const NewPollScreen(),
+        '/success': (BuildContext context) => const SuccessScreen(),
+        '/confirmation': (BuildContext context) => const ConfirmationScreen(),
+        '/details': (BuildContext context) => const DetailsScreen(),
+        '/location': (BuildContext context) => const LocationScreen(),
+        '/category': (BuildContext context) => const CategoryScreen(),
+        '/tracking': (BuildContext context) => const TrackingScreen(),
       },
     );
   }
@@ -184,6 +184,38 @@ class Category {
   });
 }
 
+class ReportStep {
+  final String title;
+  final String description;
+  String status; // 'pending', 'current', 'completed'
+
+  ReportStep({required this.title, required this.description, this.status = 'pending'});
+}
+
+class ReportData {
+  final String id; // Protocol number
+  final String categoryTitle;
+  final IconData categoryIcon;
+  final String location;
+  final String description;
+  final String? photoUrl;
+  final String submissionTime;
+  List<ReportStep> steps;
+  String overallStatus; // 'received', 'in_analysis', 'in_progress', 'completed'
+
+  ReportData({
+    required this.id,
+    required this.categoryTitle,
+    required this.categoryIcon,
+    required this.location,
+    required this.description,
+    this.photoUrl,
+    required this.submissionTime,
+    required this.steps,
+    this.overallStatus = 'received',
+  });
+}
+
 class AppState extends ChangeNotifier {
   String selectedCategory = '';
   String location = '';
@@ -205,6 +237,9 @@ class AppState extends ChangeNotifier {
 
   String? selectedPoll;
   bool isLoadingLocation = false;
+
+  ReportData? _currentReport;
+  ReportData? get currentReport => _currentReport;
 
   void setSelectedCategory(String value) {
     selectedCategory = value;
@@ -252,7 +287,7 @@ class AppState extends ChangeNotifier {
   }
 
   void addPollOption() {
-    if (_newPollOptions.length < 5) { // Limit to 5 options
+    if (_newPollOptions.length < 5) {
       _newPollOptions.add('');
       notifyListeners();
     }
@@ -292,6 +327,7 @@ class AppState extends ChangeNotifier {
     location = '';
     description = '';
     attachedPhoto = '';
+    _currentReport = null; // Clear current report
     notifyListeners();
   }
 
@@ -306,6 +342,42 @@ class AppState extends ChangeNotifier {
     _newPollTitle = '';
     _newPollOptions = <String>['', ''];
     _isPublishingPoll = false;
+    notifyListeners();
+  }
+
+  void submitReport({
+    required String categoryId,
+    required String location,
+    required String description,
+    String? photoUrl,
+    required List<Category> allCategories,
+  }) {
+    final String protocolNumber = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
+    final Category selectedCategory = allCategories.firstWhere((Category c) => c.id == categoryId);
+
+    final List<ReportStep> initialSteps = <ReportStep>[
+      ReportStep(title: 'Chamado Recebido', description: 'Seu chamado foi registrado com o protocolo #$protocolNumber.'),
+      ReportStep(title: 'Análise Inicial', description: 'A equipe responsável analisará a solicitação em até 2 dias úteis.'),
+      ReportStep(title: 'Em Andamento', description: 'Se aprovado, o problema será resolvido em até 5 dias úteis.'),
+      ReportStep(title: 'Concluído', description: 'Você será notificado sobre a conclusão do chamado.'),
+    ];
+
+    initialSteps[0].status = 'completed';
+    if (initialSteps.length > 1) {
+      initialSteps[1].status = 'current';
+    }
+
+    _currentReport = ReportData(
+      id: protocolNumber,
+      categoryTitle: selectedCategory.title,
+      categoryIcon: selectedCategory.icon,
+      location: location,
+      description: description,
+      photoUrl: photoUrl,
+      submissionTime: 'agora',
+      steps: initialSteps,
+      overallStatus: 'in_analysis',
+    );
     notifyListeners();
   }
 }
@@ -695,8 +767,6 @@ class PollsScreen extends StatelessWidget {
                                           ? null
                                           : () {
                                               appState.setSelectedPoll('${poll.id}-${option.id}');
-                                              // In a real app, you would update the backend/data model here
-                                              // For now, we just print the selection
                                               debugPrint('Voted for option ${option.id} in poll ${poll.id}');
                                             },
                                       child: Column(
@@ -961,7 +1031,7 @@ class NewPollScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pop(context); // Go back to PollsScreen
+            Navigator.pop(context);
           },
         ),
         title: const Text('Criar Nova Enquete'),
@@ -1074,15 +1144,15 @@ class NewPollScreen extends StatelessWidget {
                   onPressed: appState.isPublishingPoll || !canPublish
                       ? null
                       : () async {
-                          appState.setIsLoadingPublishingPoll(true); // Fixed method call
-                          await Future<void>.delayed(const Duration(seconds: 2)); // Simulate API call
+                          appState.setIsLoadingPublishingPoll(true);
+                          await Future<void>.delayed(const Duration(seconds: 2));
                           debugPrint('Nova enquete publicada: ${appState.newPollTitle}');
                           for (final String option in appState.newPollOptions) {
                             debugPrint(' - $option');
                           }
                           appState.resetNewPollForm();
-                          appState.setIsLoadingPublishingPoll(false); // Fixed method call
-                          Navigator.pop(context); // Go back to PollsScreen
+                          appState.setIsLoadingPublishingPoll(false);
+                          Navigator.pop(context);
                         },
                   child: appState.isPublishingPoll
                       ? const CircularProgressIndicator(color: Colors.white)
@@ -1116,7 +1186,6 @@ class NewPollScreen extends StatelessWidget {
     );
   }
 }
-
 
 class ForumScreen extends StatelessWidget {
   const ForumScreen({super.key});
@@ -1630,158 +1699,164 @@ class SuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const String protocolNumber = '901';
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: <Widget>[
-              const SizedBox(height: 32),
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: Colors.green[100],
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle, size: 48, color: Colors.green),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Chamado Recebido!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'O protocolo #$protocolNumber agora está em análise pela Prefeitura.',
-                style: const TextStyle(color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Card(
-                color: Colors.green[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: <Widget>[
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Chip(
-                            label: Text('#$protocolNumber'),
-                            backgroundColor: Colors.green,
-                            labelStyle: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Número do Protocolo',
-                        style:
-                            TextStyle(fontWeight: FontWeight.w500, color: Colors.green),
-                      ),
-                      const Text(
-                        'Guarde este número para acompanhar o andamento',
-                        style: TextStyle(color: Colors.green),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+    return Consumer<AppState>(
+      builder: (BuildContext context, AppState appState, Widget? child) {
+        final ReportData? report = appState.currentReport;
+        final String protocolNumber = report?.id ?? 'N/A'; // Use dynamic protocol
+
+        return Scaffold(
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: <Widget>[
+                  const SizedBox(height: 32),
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_circle, size: 48, color: Colors.green),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const Text(
-                        'Próximos Passos',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildStep(
-                        '1',
-                        'Análise Inicial',
-                        'Sua solicitação será analisada pela equipe responsável em até 2 dias úteis',
-                        Colors.blue,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildStep(
-                        '2',
-                        'Execução',
-                        'Se aprovado, o problema será resolvido em até 5 dias úteis',
-                        Colors.orange,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildStep(
-                        '3',
-                        'Notificação',
-                        'Você será notificado sobre o status e conclusão do chamado',
-                        Colors.purple,
-                      ),
-                    ],
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Chamado Recebido!',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 60),
-                ),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/tracking');
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Icon(Icons.visibility),
-                    SizedBox(width: 8),
-                    Text('Acompanhar Status'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 60),
-                ),
-                onPressed: () {
-                  Provider.of<AppState>(context, listen: false).resetReportForm();
-                  Navigator.pushNamed(context, '/');
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Icon(Icons.arrow_forward),
-                    SizedBox(width: 8),
-                    Text('Voltar ao Feed'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Card(
-                color: Colors.grey[50],
-                child: const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'Dúvidas? Entre em contato pelo telefone 156 ou pelo email atendimento@prefeitura.gov.br',
-                    style: TextStyle(color: Colors.grey),
+                  const SizedBox(height: 8),
+                  Text(
+                    'O protocolo #$protocolNumber agora está em análise pela Prefeitura.',
+                    style: const TextStyle(color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Card(
+                    color: Colors.green[50],
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: <Widget>[
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.green[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Chip(
+                                label: Text('#$protocolNumber'),
+                                backgroundColor: Colors.green,
+                                labelStyle: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Número do Protocolo',
+                            style:
+                                TextStyle(fontWeight: FontWeight.w500, color: Colors.green),
+                          ),
+                          const Text(
+                            'Guarde este número para acompanhar o andamento',
+                            style: TextStyle(color: Colors.green),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          const Text(
+                            'Próximos Passos',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildStep(
+                            '1',
+                            'Análise Inicial',
+                            'Sua solicitação será analisada pela equipe responsável em até 2 dias úteis',
+                            Colors.blue,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildStep(
+                            '2',
+                            'Execução',
+                            'Se aprovado, o problema será resolvido em até 5 dias úteis',
+                            Colors.orange,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildStep(
+                            '3',
+                            'Notificação',
+                            'Você será notificado sobre o status e conclusão do chamado',
+                            Colors.purple,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 60),
+                    ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/tracking');
+                    },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.visibility),
+                        SizedBox(width: 8),
+                        Text('Acompanhar Status'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 60),
+                    ),
+                    onPressed: () {
+                      Provider.of<AppState>(context, listen: false).resetReportForm();
+                      Navigator.pushNamed(context, '/');
+                    },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(Icons.arrow_forward),
+                        SizedBox(width: 8),
+                        Text('Voltar ao Feed'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    color: Colors.grey[50],
+                    child: const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        'Dúvidas? Entre em contato pelo telefone 156 ou pelo email atendimento@prefeitura.gov.br',
+                        style: TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -1900,7 +1975,6 @@ class ConfirmationScreen extends StatelessWidget {
       ),
       body: Consumer<AppState>(
         builder: (BuildContext context, AppState appState, Widget? child) {
-          // Find the selected category data, providing a fallback if not found (though it should be found now)
           final Category selectedCategoryData =
               categories.firstWhere((Category c) => c.id == appState.selectedCategory, orElse: () => categories[0]);
 
@@ -2032,7 +2106,13 @@ class ConfirmationScreen extends StatelessWidget {
                     backgroundColor: Colors.green,
                   ),
                   onPressed: () {
-                    // In a real app, send data to backend here
+                    appState.submitReport(
+                      categoryId: appState.selectedCategory,
+                      location: appState.location,
+                      description: appState.description,
+                      photoUrl: appState.attachedPhoto.isNotEmpty ? appState.attachedPhoto : null,
+                      allCategories: categories,
+                    );
                     Navigator.pushNamed(context, '/success');
                   },
                   child: const Row(
@@ -2053,6 +2133,43 @@ class ConfirmationScreen extends StatelessWidget {
                     Navigator.pushNamed(context, '/details');
                   },
                   child: const Text('Voltar e Corrigir'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                  onPressed: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        return AlertDialog(
+                          title: const Text('Cancelar Processo'),
+                          content: const Text(
+                              'Você tem certeza que deseja cancelar o processo de reporte? Todas as informações serão perdidas.'),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: const Text('Não'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                appState.resetReportForm();
+                                Navigator.pushNamed(context, '/');
+                              },
+                              child: const Text('Sim', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: const Text('Cancelar Processo'),
                 ),
               ],
             ),
@@ -2133,7 +2250,6 @@ class DetailsScreen extends StatelessWidget {
   ];
 
   void handlePhotoAttachment(AppState appState) {
-    // Simulate attaching a photo
     appState.setAttachedPhoto('foto_problema.jpg');
   }
 
@@ -2314,6 +2430,43 @@ class DetailsScreen extends StatelessWidget {
                         },
                   child: const Text('Revisar Chamado'),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                  onPressed: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        return AlertDialog(
+                          title: const Text('Cancelar Processo'),
+                          content: const Text(
+                              'Você tem certeza que deseja cancelar o processo de reporte? Todas as informações serão perdidas.'),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: const Text('Não'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                appState.resetReportForm();
+                                Navigator.pushNamed(context, '/');
+                              },
+                              child: const Text('Sim', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: const Text('Cancelar Processo'),
+                ),
               ],
             ),
           );
@@ -2329,9 +2482,7 @@ class LocationScreen extends StatelessWidget {
   Future<void> handleUseCurrentLocation(AppState appState) async {
     appState.setIsLoadingLocation(true);
     try {
-      // Simulate a network request or GPS acquisition delay
       await Future<void>.delayed(const Duration(seconds: 2));
-      // Mocked location data
       appState.setLocation('Localização atual (Exemplo de Lat: -23.5505, Long: -46.6333)');
     } catch (e) {
       appState.setLocation('Erro ao obter localização');
@@ -2445,6 +2596,43 @@ class LocationScreen extends StatelessWidget {
                           Navigator.pushNamed(context, '/details');
                         },
                   child: const Text('Próximo'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                  onPressed: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        return AlertDialog(
+                          title: const Text('Cancelar Processo'),
+                          content: const Text(
+                              'Você tem certeza que deseja cancelar o processo de reporte? Todas as informações serão perdidas.'),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: const Text('Não'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                appState.resetReportForm();
+                                Navigator.pushNamed(context, '/');
+                              },
+                              child: const Text('Sim', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: const Text('Cancelar Processo'),
                 ),
               ],
             ),
@@ -2612,6 +2800,43 @@ class CategoryScreen extends StatelessWidget {
                     },
                   ),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                  onPressed: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        return AlertDialog(
+                          title: const Text('Cancelar Processo'),
+                          content: const Text(
+                              'Você tem certeza que deseja cancelar o processo de reporte? Todas as informações serão perdidas.'),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: const Text('Não'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                appState.resetReportForm();
+                                Navigator.pushNamed(context, '/');
+                              },
+                              child: const Text('Sim', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: const Text('Cancelar Processo'),
+                ),
               ],
             ),
           );
@@ -2623,6 +2848,108 @@ class CategoryScreen extends StatelessWidget {
 
 class TrackingScreen extends StatelessWidget {
   const TrackingScreen({super.key});
+
+  Widget _buildStepTile({
+    required BuildContext context,
+    required ReportStep step,
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    final bool isCompleted = step.status == 'completed';
+    final bool isCurrent = step.status == 'current';
+    final Color lineColor = isCompleted || isCurrent ? Theme.of(context).primaryColor : Colors.grey[400]!;
+    final Color circleColor = isCompleted ? Colors.green : (isCurrent ? Theme.of(context).primaryColor : Colors.grey[400]!);
+    final IconData icon = isCompleted ? Icons.check : (isCurrent ? Icons.circle : Icons.radio_button_off);
+    final Color iconColor = isCompleted ? Colors.white : (isCurrent ? Colors.white : Colors.grey[600]!);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Column(
+            children: <Widget>[
+              if (!isFirst)
+                Container(
+                  width: 2,
+                  height: 20,
+                  color: lineColor,
+                ),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: circleColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 16, color: iconColor),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: lineColor,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(top: isFirst ? 0 : 4, bottom: isLast ? 0 : 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    step.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isCompleted || isCurrent ? Colors.black87 : Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    step.description,
+                    style: TextStyle(
+                      color: isCompleted || isCurrent ? Colors.grey[700] : Colors.grey[500],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isLongText = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: isLongText ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        children: <Widget>[
+          Icon(icon, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text('$label:', style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.grey),
+              overflow: isLongText ? TextOverflow.ellipsis : TextOverflow.clip,
+              maxLines: isLongText ? 3 : 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2636,35 +2963,175 @@ class TrackingScreen extends StatelessWidget {
         ),
         title: const Text('Acompanhar Chamado'),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Icon(Icons.construction, size: 80, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                'Funcionalidade de acompanhamento em desenvolvimento...',
-                style: TextStyle(color: Colors.grey[600], fontSize: 18),
-                textAlign: TextAlign.center,
+      body: Consumer<AppState>(
+        builder: (BuildContext context, AppState appState, Widget? child) {
+          final ReportData? report = appState.currentReport;
+
+          if (report == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(Icons.info_outline, size: 80, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Nenhum chamado recente para acompanhar.',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Envie um novo chamado para ver o status aqui.',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: () {
+                        appState.resetReportForm();
+                        Navigator.pushNamedAndRemoveUntil(context, '/category', (Route<dynamic> route) => false);
+                      },
+                      child: const Text('Fazer um novo chamado'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Em breve, você poderá ver o status em tempo real do seu chamado aqui.',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text('Voltar'),
-              ),
-            ],
-          ),
-        ),
+            );
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Status do seu protocolo',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Acompanhe o andamento do seu chamado #${report.id} em tempo real.',
+                  style: const TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.campaign, size: 16),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Detalhes do Chamado',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        _buildDetailRow(
+                            icon: report.categoryIcon,
+                            label: 'Categoria',
+                            value: report.categoryTitle),
+                        _buildDetailRow(
+                            icon: Icons.location_on,
+                            label: 'Localização',
+                            value: report.location),
+                        _buildDetailRow(
+                            icon: Icons.description,
+                            label: 'Descrição',
+                            value: report.description,
+                            isLongText: true),
+                        if (report.photoUrl != null && report.photoUrl!.isNotEmpty)
+                          _buildDetailRow(
+                              icon: Icons.camera_alt,
+                              label: 'Foto Anexada',
+                              value: report.photoUrl!),
+                        _buildDetailRow(
+                            icon: Icons.access_time,
+                            label: 'Data de Envio',
+                            value: 'Protocolado ${report.submissionTime}'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.timeline, size: 16, color: Colors.green),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Progresso do Chamado',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: report.steps.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return _buildStepTile(
+                              context: context,
+                              step: report.steps[index],
+                              isFirst: index == 0,
+                              isLast: index == report.steps.length - 1,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 60),
+                  ),
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(context, '/', (Route<dynamic> route) => false);
+                  },
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(Icons.home),
+                      SizedBox(width: 8),
+                      Text('Voltar à Página Inicial'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
