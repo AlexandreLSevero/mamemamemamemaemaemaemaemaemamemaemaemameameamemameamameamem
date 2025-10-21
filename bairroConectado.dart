@@ -27,7 +27,7 @@ class BairroConectadoApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: Colors.blue, // Using a direct color as theme context might not be available
+          backgroundColor: Colors.blue,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
@@ -55,7 +55,7 @@ class BairroConectadoApp extends StatelessWidget {
           ),
         ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: Colors.blue, // Using a direct color as theme context might not be available
+          selectedItemColor: Colors.blue,
           unselectedItemColor: Colors.grey[600],
           backgroundColor: Colors.white,
           elevation: 8,
@@ -187,7 +187,7 @@ class Category {
 class ReportStep {
   final String title;
   final String description;
-  String status; // 'pending', 'current', 'completed'
+  String status;
 
   ReportStep({required this.title, required this.description, this.status = 'pending'});
 }
@@ -201,7 +201,7 @@ class ReportData {
   final String? photoUrl;
   final String submissionTime;
   List<ReportStep> steps;
-  String overallStatus; // 'received', 'in_analysis', 'in_progress', 'completed'
+  String overallStatus;
 
   ReportData({
     required this.id,
@@ -228,7 +228,7 @@ class AppState extends ChangeNotifier {
   String newTopicCategory = '';
 
   String _newPollTitle = '';
-  List<String> _newPollOptions = <String>['', '']; // Start with two empty options
+  List<String> _newPollOptions = <String>['', ''];
   bool _isPublishingPoll = false;
 
   String get newPollTitle => _newPollTitle;
@@ -327,7 +327,7 @@ class AppState extends ChangeNotifier {
     location = '';
     description = '';
     attachedPhoto = '';
-    _currentReport = null; // Clear current report
+    _currentReport = null;
     notifyListeners();
   }
 
