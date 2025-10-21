@@ -382,6 +382,7 @@ class AppState extends ChangeNotifier {
   }
 }
 
+// Página Principal
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -595,6 +596,8 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+
+// Página das Enquetes
 class PollsScreen extends StatelessWidget {
   const PollsScreen({super.key});
 
@@ -1021,6 +1024,7 @@ class PollsScreen extends StatelessWidget {
   }
 }
 
+// Página de criação de enquete
 class NewPollScreen extends StatelessWidget {
   const NewPollScreen({super.key});
 
@@ -1187,6 +1191,7 @@ class NewPollScreen extends StatelessWidget {
   }
 }
 
+// Página do Forúm
 class ForumScreen extends StatelessWidget {
   const ForumScreen({super.key});
 
@@ -1467,6 +1472,7 @@ class ForumScreen extends StatelessWidget {
   }
 }
 
+// Página de criar post no Fórum
 class NewTopicScreen extends StatelessWidget {
   const NewTopicScreen({super.key});
 
@@ -1861,6 +1867,7 @@ class SuccessScreen extends StatelessWidget {
   }
 }
 
+// Página de Reportar Problema
 class ConfirmationScreen extends StatelessWidget {
   const ConfirmationScreen({super.key});
 
@@ -2180,6 +2187,7 @@ class ConfirmationScreen extends StatelessWidget {
   }
 }
 
+// Página de detalhamento do Problema
 class DetailsScreen extends StatelessWidget {
   const DetailsScreen({super.key});
 
@@ -2476,6 +2484,7 @@ class DetailsScreen extends StatelessWidget {
   }
 }
 
+// Página para botar a localização do Problema
 class LocationScreen extends StatelessWidget {
   const LocationScreen({super.key});
 
@@ -2846,6 +2855,7 @@ class CategoryScreen extends StatelessWidget {
   }
 }
 
+// Página de conclusão de reporte
 class TrackingScreen extends StatelessWidget {
   const TrackingScreen({super.key});
 
